@@ -7,6 +7,8 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.text.Editable
 import android.text.TextWatcher
 import android.view.View
@@ -47,6 +49,14 @@ class MainActivity : AppCompatActivity() {
 
     @Volatile private var sending = false
 
+    private val pollHandler = Handler(Looper.getMainLooper())
+    private val pollRunnable: Runnable = object : Runnable {
+        override fun run() {
+            refreshHostDevice()
+            pollHandler.postDelayed(this, 2000)
+        }
+    }
+
     private val permLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { result ->
@@ -85,6 +95,13 @@ class MainActivity : AppCompatActivity() {
 
         // ── 우측 [전송] 버튼 ──
         sendBtn.setOnClickListener { triggerSend() }
+
+        // ── 상태바 탭 → 재연결 시도 ──
+        statusText.setOnClickListener {
+            refreshHostDevice()
+            if (hostDevice == null)
+                Toast.makeText(this, "연결된 PC를 찾지 못했습니다", Toast.LENGTH_SHORT).show()
+        }
 
         // ── 상단 빈 영역 탭 → 키보드 내리고 전송 트리거 ──
         topTapZone.setOnClickListener {
@@ -179,8 +196,13 @@ class MainActivity : AppCompatActivity() {
                     override fun onAppStatusChanged(pluggedDevice: BluetoothDevice?, registered2: Boolean) {
                         this@MainActivity.registered = registered2
                         runOnUiThread {
-                            if (registered2 && hostDevice == null)
-                                statusText.text = "PC에서 'VoiceBridge' 페어링하세요"
+                            if (registered2) {
+                                // Start polling immediately after registration
+                                pollHandler.removeCallbacks(pollRunnable)
+                                pollHandler.postDelayed(pollRunnable, 500)
+                                if (hostDevice == null)
+                                    statusText.text = "PC에서 'VoiceBridge' 페어링하세요"
+                            }
                         }
                     }
                     override fun onConnectionStateChanged(device: BluetoothDevice?, state: Int) {
@@ -190,7 +212,7 @@ class MainActivity : AppCompatActivity() {
                                 setConnected(true, device?.name ?: "PC 연결됨")
                             } else if (state == BluetoothProfile.STATE_DISCONNECTED) {
                                 hostDevice = null
-                                setConnected(false, "연결 끊김 (다시 연결하세요)")
+                                setConnected(false, "연결 끊김 — 탭하여 재연결")
                             }
                         }
                     }
@@ -203,7 +225,10 @@ class MainActivity : AppCompatActivity() {
     // ── 텍스트 전송 (핵심) ──
     private fun sendText() {
         val text = editor.text.toString()
-        if (text.isEmpty() || hostDevice == null) return
+        if (text.isEmpty()) return
+        // Eagerly resolve hostDevice in case the callback was missed
+        if (hostDevice == null) refreshHostDevice()
+        if (hostDevice == null) return
 
         // 전송 끝에 항상 Enter 1회 (요구사항: "엔터 한 번으로 메시지 전부 넘어감")
         val payload = text + "\n"
@@ -250,6 +275,24 @@ class MainActivity : AppCompatActivity() {
         } catch (e: SecurityException) { /* ignore */ }
     }
 
+    private fun refreshHostDevice() {
+        val hid = hidDevice ?: return
+        if (!hasConnectPerm()) return
+        try {
+            val connected = hid.getDevicesMatchingConnectionStates(
+                intArrayOf(BluetoothProfile.STATE_CONNECTED)
+            )
+            val first = connected.firstOrNull()
+            if (first != null && hostDevice == null) {
+                hostDevice = first
+                runOnUiThread { setConnected(true, first.name ?: "PC 연결됨") }
+            } else if (first == null && hostDevice != null) {
+                hostDevice = null
+                runOnUiThread { setConnected(false, "연결 끊김 — 탭하여 재연결") }
+            }
+        } catch (e: SecurityException) { /* ignore */ }
+    }
+
     private fun setConnected(connected: Boolean, label: String) {
         statusText.text = label
         statusDot.setBackgroundResource(
@@ -271,6 +314,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        pollHandler.removeCallbacks(pollRunnable)
         try {
             if (registered && hasConnectPerm()) hidDevice?.unregisterApp()
         } catch (e: SecurityException) {}
