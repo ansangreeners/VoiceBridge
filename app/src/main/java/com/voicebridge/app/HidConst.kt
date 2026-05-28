@@ -11,31 +11,57 @@ package com.voicebridge.app
  */
 object HidConst {
 
-    // 표준 키보드 HID 리포트 디스크립터
+    // Boot Protocol Keyboard descriptor — matches Windows kbdhid.sys expectations:
+    // Report ID 1, 8-bit modifiers, 1-byte reserved, LED output, 6-key array.
+    // LED Output section is required for Windows to bind kbdhid.sys instead of a
+    // generic HID driver. Logical Max 255 covers the full USB HID key code range.
     val REPORT_DESCRIPTOR = byteArrayOf(
-        0x05.toByte(), 0x01.toByte(),  // Usage Page (Generic Desktop)
-        0x09.toByte(), 0x06.toByte(),  // Usage (Keyboard)
-        0xA1.toByte(), 0x01.toByte(),  // Collection (Application)
-        0x05.toByte(), 0x07.toByte(),  // Usage Page (Key Codes)
-        0x19.toByte(), 0xE0.toByte(),  // Usage Min (224)
-        0x29.toByte(), 0xE7.toByte(),  // Usage Max (231)
-        0x15.toByte(), 0x00.toByte(),  // Logical Min (0)
-        0x25.toByte(), 0x01.toByte(),  // Logical Max (1)
-        0x75.toByte(), 0x01.toByte(),  // Report Size (1)
-        0x95.toByte(), 0x08.toByte(),  // Report Count (8)
-        0x81.toByte(), 0x02.toByte(),  // Input (Data, Variable, Absolute) — modifiers
-        0x95.toByte(), 0x01.toByte(),  // Report Count (1)
-        0x75.toByte(), 0x08.toByte(),  // Report Size (8)
-        0x81.toByte(), 0x01.toByte(),  // Input (Constant) — reserved
-        0x95.toByte(), 0x06.toByte(),  // Report Count (6)
-        0x75.toByte(), 0x08.toByte(),  // Report Size (8)
-        0x15.toByte(), 0x00.toByte(),  // Logical Min (0)
-        0x25.toByte(), 0x65.toByte(),  // Logical Max (101)
-        0x05.toByte(), 0x07.toByte(),  // Usage Page (Key Codes)
-        0x19.toByte(), 0x00.toByte(),  // Usage Min (0)
-        0x29.toByte(), 0x65.toByte(),  // Usage Max (101)
-        0x81.toByte(), 0x00.toByte(),  // Input (Data, Array) — keys
-        0xC0.toByte()                  // End Collection
+        0x05.toByte(), 0x01.toByte(),        // Usage Page (Generic Desktop Controls)
+        0x09.toByte(), 0x06.toByte(),        // Usage (Keyboard)
+        0xA1.toByte(), 0x01.toByte(),        // Collection (Application)
+
+        // ── Report ID ──
+        0x85.toByte(), 0x01.toByte(),        // Report ID (1)
+
+        // ── Modifier keys: 8 × 1-bit ──
+        0x05.toByte(), 0x07.toByte(),        // Usage Page (Keyboard/Keypad)
+        0x19.toByte(), 0xE0.toByte(),        // Usage Minimum (Left Control)
+        0x29.toByte(), 0xE7.toByte(),        // Usage Maximum (Right GUI)
+        0x15.toByte(), 0x00.toByte(),        // Logical Minimum (0)
+        0x25.toByte(), 0x01.toByte(),        // Logical Maximum (1)
+        0x75.toByte(), 0x01.toByte(),        // Report Size (1)
+        0x95.toByte(), 0x08.toByte(),        // Report Count (8)
+        0x81.toByte(), 0x02.toByte(),        // Input (Data, Variable, Absolute)
+
+        // ── Reserved byte ──
+        0x95.toByte(), 0x01.toByte(),        // Report Count (1)
+        0x75.toByte(), 0x08.toByte(),        // Report Size (8)
+        0x81.toByte(), 0x03.toByte(),        // Input (Constant, Variable, Absolute)
+
+        // ── LED output: NumLock/CapsLock/ScrollLock/Compose/Kana (5 × 1-bit) ──
+        0x95.toByte(), 0x05.toByte(),        // Report Count (5)
+        0x75.toByte(), 0x01.toByte(),        // Report Size (1)
+        0x05.toByte(), 0x08.toByte(),        // Usage Page (LEDs)
+        0x19.toByte(), 0x01.toByte(),        // Usage Minimum (Num Lock)
+        0x29.toByte(), 0x05.toByte(),        // Usage Maximum (Kana)
+        0x91.toByte(), 0x02.toByte(),        // Output (Data, Variable, Absolute)
+
+        // ── LED padding: 3 bits → full byte ──
+        0x95.toByte(), 0x01.toByte(),        // Report Count (1)
+        0x75.toByte(), 0x03.toByte(),        // Report Size (3)
+        0x91.toByte(), 0x03.toByte(),        // Output (Constant, Variable, Absolute)
+
+        // ── Key array: 6 × 8-bit ──
+        0x95.toByte(), 0x06.toByte(),        // Report Count (6)
+        0x75.toByte(), 0x08.toByte(),        // Report Size (8)
+        0x15.toByte(), 0x00.toByte(),        // Logical Minimum (0)
+        0x26.toByte(), 0xFF.toByte(), 0x00.toByte(), // Logical Maximum (255)
+        0x05.toByte(), 0x07.toByte(),        // Usage Page (Keyboard/Keypad)
+        0x19.toByte(), 0x00.toByte(),        // Usage Minimum (0)
+        0x29.toByte(), 0xFF.toByte(),        // Usage Maximum (255)
+        0x81.toByte(), 0x00.toByte(),        // Input (Data, Array)
+
+        0xC0.toByte()                        // End Collection
     )
 
     private const val SHIFT = 0x02

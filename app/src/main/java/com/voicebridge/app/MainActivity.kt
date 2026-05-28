@@ -271,7 +271,7 @@ class MainActivity : AppCompatActivity() {
                 modifier.toByte(), 0,
                 keyCode.toByte(), 0, 0, 0, 0, 0
             )
-            hid.sendReport(dev, 0, report)
+            hid.sendReport(dev, 1, report)
         } catch (e: SecurityException) { /* ignore */ }
     }
 
