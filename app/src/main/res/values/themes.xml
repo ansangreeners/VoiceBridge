@@ -1,0 +1,7 @@
+<resources>
+    <style name="Theme.VoiceBridge" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <item name="colorPrimary">#00E5FF</item>
+        <item name="colorAccent">#FFC857</item>
+        <item name="android:statusBarColor">#05080C</item>
+    </style>
+</resources>

@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/rootView"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#0A0E14">
+
+    <!-- 상단 슬림 헤더: 상태표시 한 줄 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="#121821"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:paddingTop="10dp"
+        android:paddingBottom="10dp">
+
+        <View
+            android:id="@+id/statusDot"
+            android:layout_width="10dp"
+            android:layout_height="10dp"
+            android:background="@drawable/dot_red"
+            android:layout_marginEnd="10dp"/>
+
+        <TextView
+            android:id="@+id/statusText"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="준비 중…"
+            android:textColor="#E8EEF5"
+            android:textSize="12sp"
+            android:singleLine="true"
+            android:ellipsize="end"/>
+
+        <TextView
+            android:id="@+id/charCount"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="0자"
+            android:textColor="#00E5FF"
+            android:textSize="12sp"/>
+    </LinearLayout>
+
+    <!-- ◤ 상단 텍스트박스: 누적 메시지 표시(읽기 전용 느낌, 탭하면 전송 트리거) ◢ -->
+    <FrameLayout
+        android:id="@+id/displayWrap"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:background="#0A0E14">
+
+        <ScrollView
+            android:id="@+id/displayScroll"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:padding="16dp"
+            android:fillViewport="true">
+
+            <TextView
+                android:id="@+id/displayText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text=""
+                android:hint="여기에 입력한 메시지가 표시됩니다.\n빈 곳을 탭하면 PC로 전송됩니다."
+                android:textColor="#E8EEF5"
+                android:textColorHint="#3D4856"
+                android:textSize="17sp"
+                android:lineSpacingExtra="3dp"
+                android:textIsSelectable="false"/>
+        </ScrollView>
+
+        <!-- 상단 영역 전체를 탭 가능하게 (전송 트리거) -->
+        <View
+            android:id="@+id/topTapZone"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@android:color/transparent"/>
+    </FrameLayout>
+
+    <!-- 가는 구분선 -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="#1A2330"/>
+
+    <!-- ◤ 하단 메시지 입력박스 (카톡식): 탭 → 갤럭시 키보드 팝업 ◢ -->
+    <LinearLayout
+        android:id="@+id/inputBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="#121821"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp">
+
+        <EditText
+            android:id="@+id/editor"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:minHeight="44dp"
+            android:maxHeight="120dp"
+            android:background="#0A0E14"
+            android:paddingStart="14dp"
+            android:paddingEnd="14dp"
+            android:paddingTop="10dp"
+            android:paddingBottom="10dp"
+            android:hint="메시지 입력 (마이크 또는 키보드)"
+            android:textColorHint="#5A6675"
+            android:textColor="#E8EEF5"
+            android:textSize="16sp"
+            android:inputType="textMultiLine|textAutoCorrect"
+            android:imeOptions="actionNone"/>
+
+        <Button
+            android:id="@+id/sendBtn"
+            android:layout_width="wrap_content"
+            android:layout_height="44dp"
+            android:minWidth="64dp"
+            android:text="전송"
+            android:textColor="#1A1205"
+            android:textStyle="bold"
+            android:textSize="14sp"
+            android:backgroundTint="#FFC857"
+            android:layout_marginStart="8dp"
+            android:enabled="false"/>
+    </LinearLayout>
+
+</LinearLayout>
