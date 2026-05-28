@@ -3,6 +3,7 @@ package com.voicebridge.app
 import android.Manifest
 import android.bluetooth.*
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -148,16 +149,32 @@ class MainActivity : AppCompatActivity() {
         val hid = hidDevice ?: return
         if (!hasConnectPerm()) return
 
+        // Force discoverable so HID advertisement takes priority over generic phone BT profile
+        startActivity(
+            Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE).apply {
+                putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION, 300)
+            }
+        )
+
         val sdp = BluetoothHidDeviceAppSdpSettings(
             "VoiceBridge",
-            "Wireless keyboard from phone",
+            "Bluetooth HID Keyboard Device",
             "VoiceBridge",
             BluetoothHidDevice.SUBCLASS1_KEYBOARD,
             HidConst.REPORT_DESCRIPTOR
         )
 
+        val inQos = BluetoothHidDeviceAppQosSettings(
+            BluetoothHidDeviceAppQosSettings.SERVICE_BEST_EFFORT,
+            800, 9, 0, 11250, BluetoothHidDeviceAppQosSettings.MAX
+        )
+        val outQos = BluetoothHidDeviceAppQosSettings(
+            BluetoothHidDeviceAppQosSettings.SERVICE_BEST_EFFORT,
+            800, 9, 0, 11250, BluetoothHidDeviceAppQosSettings.MAX
+        )
+
         try {
-            hid.registerApp(sdp, null, null, { it.run() },
+            hid.registerApp(sdp, inQos, outQos, { it.run() },
                 object : BluetoothHidDevice.Callback() {
                     override fun onAppStatusChanged(pluggedDevice: BluetoothDevice?, registered2: Boolean) {
                         this@MainActivity.registered = registered2
