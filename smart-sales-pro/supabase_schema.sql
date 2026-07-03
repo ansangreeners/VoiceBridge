@@ -38,7 +38,9 @@ create policy "anon read logs" on daily_logs for select using (true);
 -- 샘플 데이터
 insert into hospitals (name, chart) values
 ('서울중앙병원', '[{"metric":"약가 대비 효율","ours":92,"theirs":70},{"metric":"부작용 발생률","ours":88,"theirs":62},{"metric":"복용 편의성","ours":80,"theirs":75}]');
+-- 한 병원에 담당의 다수 등록 가능 (officials.hospital_id 로 1:N 관계)
 insert into officials (hospital_id, doctor_name, department, keywords) values
-(1, '김철수 과장', '내과', array['가격 경쟁력','부작용 우려','월 처방량 확대']);
+(1, '김철수 과장', '내과', array['가격 경쟁력','부작용 우려','월 처방량 확대']),
+(1, '정미라 과장', '외과', array['수술 후 통증 관리','재고 확보','임상 사례 자료']);
 insert into daily_logs (hospital_id, note) values
 (1, '지난번 경쟁사 A제품 언급, 가격 민감');

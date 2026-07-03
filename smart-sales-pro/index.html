@@ -150,6 +150,16 @@
         }
         .section-label { font-size: 12px; font-weight: 800; color: var(--color-muted); margin: 4px 0 10px; text-transform: uppercase; letter-spacing: .5px;}
 
+        /* 담당의 탭 (다수 담당의 지원) */
+        .doc-tabs { display: none; gap: 6px; margin: 2px 0 10px; flex-wrap: wrap; }
+        .doc-tab {
+            border: 1px solid var(--color-line); background: #F8FAFC; color: var(--color-muted);
+            padding: 6px 12px; border-radius: 999px; font-size: 12px; font-weight: 700;
+            cursor: pointer; font-family: inherit;
+        }
+        .doc-tab.active { background: var(--color-brand); border-color: var(--color-brand); color: #fff; }
+        .doc-tab:active { transform: scale(.96); }
+
         /* 제품 비교 차트 */
         .cmp-row { margin-bottom: 12px; }
         .cmp-head { display: flex; justify-content: space-between; font-size: 12.5px; font-weight: 700; margin-bottom: 5px; }
@@ -277,6 +287,7 @@
     <div class="modal" id="reminderModal">
         <div class="reminder-badge">⚡ 면담 1분 전</div>
         <h2 class="modal-title" id="rmName"></h2>
+        <div class="doc-tabs" id="rmDocTabs"></div>
         <p class="modal-sub" id="rmDoctor"></p>
 
         <div class="section-label">🔑 과거 상담 핵심 키워드</div>
@@ -305,12 +316,16 @@
         LIVE = true;
     }
 
-    /* Mock 데이터 (아티팩트 미리보기 / 미연동 시) */
+    /* Mock 데이터 (아티팩트 미리보기 / 미연동 시)
+       officials: 병원당 다수 담당의 배열 (첫 병원은 2명으로 탭 예시) */
     const MOCK = [
         {
-            id: 1, name: "서울중앙병원", doctor: "김철수 과장 · 내과",
+            id: 1, name: "서울중앙병원",
             last_note: "지난번 경쟁사 A제품 언급, 가격 민감",
-            keywords: ["가격 경쟁력", "부작용 우려", "월 처방량 확대"],
+            officials: [
+                { doctor_name: "김철수 과장", department: "내과", keywords: ["가격 경쟁력", "부작용 우려", "월 처방량 확대"] },
+                { doctor_name: "정미라 과장", department: "외과", keywords: ["수술 후 통증 관리", "재고 확보", "임상 사례 자료"] }
+            ],
             chart: [
                 { metric: "약가 대비 효율", ours: 92, theirs: 70 },
                 { metric: "부작용 발생률(낮을수록↑)", ours: 88, theirs: 62 },
@@ -318,9 +333,11 @@
             ]
         },
         {
-            id: 2, name: "수원성모의원", doctor: "박영희 원장 · 가정의학",
+            id: 2, name: "수원성모의원",
             last_note: "수액제 재고 이슈, 납기 확인 요청",
-            keywords: ["납기 안정성", "IV 수액 단가", "묶음 발주"],
+            officials: [
+                { doctor_name: "박영희 원장", department: "가정의학", keywords: ["납기 안정성", "IV 수액 단가", "묶음 발주"] }
+            ],
             chart: [
                 { metric: "납기 신뢰도", ours: 95, theirs: 68 },
                 { metric: "단가 경쟁력", ours: 78, theirs: 82 },
@@ -328,9 +345,11 @@
             ]
         },
         {
-            id: 3, name: "안성365의원", doctor: "이준호 원장 · 정형외과",
+            id: 3, name: "안성365의원",
             last_note: "영양수액 신제품 관심, 임상 데이터 요청",
-            keywords: ["임상 근거", "영양수액", "샘플 요청"],
+            officials: [
+                { doctor_name: "이준호 원장", department: "정형외과", keywords: ["임상 근거", "영양수액", "샘플 요청"] }
+            ],
             chart: [
                 { metric: "임상 데이터 충실도", ours: 90, theirs: 55 },
                 { metric: "가격", ours: 72, theirs: 80 },
@@ -355,13 +374,11 @@
                     .order('created_at', { foreignTable: 'daily_logs', ascending: false });
                 if (error) throw error;
                 hospitals = (data || []).map(h => {
-                    const off = (h.officials && h.officials[0]) || {};
                     const log = (h.daily_logs && h.daily_logs[0]) || {};
                     return {
                         id: h.id, name: h.name,
-                        doctor: `${off.doctor_name || ''} ${off.department ? '· ' + off.department : ''}`,
                         last_note: log.note || '기록 없음',
-                        keywords: off.keywords || [],
+                        officials: h.officials || [],
                         chart: h.chart || []
                     };
                 });
@@ -384,33 +401,45 @@
         else { b.className = 'data-banner mock'; t.textContent = 'Mock 모드 — 배포 후 Supabase 키 입력 시 실 DB 연동'; }
     }
 
+    function doctorLabel(o) {
+        return `${o.doctor_name || '담당의 미등록'}${o.department ? ' · ' + o.department : ''}`;
+    }
+
     function renderHospitals() {
         const list = document.getElementById('hospitalList');
         if (!hospitals.length) { list.innerHTML = '<div class="empty">등록된 거래처가 없습니다</div>'; return; }
-        list.innerHTML = hospitals.map(h => `
+        list.innerHTML = hospitals.map(h => {
+            const officials = h.officials || [];
+            const keywordCount = officials.reduce((s,o) => s + (o.keywords ? o.keywords.length : 0), 0);
+            const doctorLine = officials.length
+                ? doctorLabel(officials[0]) + (officials.length > 1 ? ` 외 ${officials.length - 1}명` : '')
+                : '담당의 미등록';
+            return `
             <div class="hospital-card" onclick="showReminder(${h.id})">
                 <div class="card-top">
                     <h3>${h.name}</h3>
-                    ${h.keywords && h.keywords.length ? '<span class="point-tag">면담 포인트 '+h.keywords.length+'</span>' : ''}
+                    ${keywordCount ? '<span class="point-tag">면담 포인트 '+keywordCount+'</span>' : ''}
                 </div>
-                <p class="doctor">${h.doctor}</p>
+                <p class="doctor">${doctorLine}</p>
                 <p class="last-note">📌 ${h.last_note}</p>
             </div>
-        `).join('');
+        `;
+        }).join('');
     }
 
     /* =========================================================
-       2. 면담 1분 전 리마인더 (키워드 3개 + 비교 차트)
+       2. 면담 1분 전 리마인더 (키워드 3개 + 비교 차트 + 담당의 탭)
     ========================================================= */
+    let currentReminder = null;
+
     function showReminder(id) {
         const h = hospitals.find(x => x.id === id);
         if (!h) return;
+        currentReminder = h;
         document.getElementById('rmName').textContent = h.name;
-        document.getElementById('rmDoctor').textContent = h.doctor;
 
-        document.getElementById('rmKeywords').innerHTML =
-            (h.keywords || []).slice(0,3).map(k => `<span class="kw">${k}</span>`).join('')
-            || '<span class="kw">기록 없음</span>';
+        const officials = (h.officials && h.officials.length) ? h.officials : [{}];
+        renderDocTabs(officials, 0);
 
         document.getElementById('rmChart').innerHTML = (h.chart || []).map(c => {
             const ours = c.ours, theirs = c.theirs;
@@ -429,6 +458,34 @@
         document.getElementById('backdrop').classList.add('show');
         document.getElementById('reminderModal').classList.add('show');
     }
+
+    function renderDocTabs(officials, activeIdx) {
+        const tabsEl = document.getElementById('rmDocTabs');
+        if (officials.length > 1) {
+            tabsEl.style.display = 'flex';
+            tabsEl.innerHTML = officials.map((o, i) => `
+                <button type="button" class="doc-tab ${i === activeIdx ? 'active' : ''}" onclick="selectDocTab(${i})">${o.doctor_name || '담당의 ' + (i + 1)}</button>
+            `).join('');
+        } else {
+            tabsEl.style.display = 'none';
+            tabsEl.innerHTML = '';
+        }
+        renderDocDetail(officials[activeIdx]);
+    }
+
+    function selectDocTab(idx) {
+        const officials = (currentReminder && currentReminder.officials && currentReminder.officials.length) ? currentReminder.officials : [{}];
+        document.querySelectorAll('#rmDocTabs .doc-tab').forEach((t, i) => t.classList.toggle('active', i === idx));
+        renderDocDetail(officials[idx]);
+    }
+
+    function renderDocDetail(o) {
+        document.getElementById('rmDoctor').textContent = doctorLabel(o || {});
+        document.getElementById('rmKeywords').innerHTML =
+            ((o && o.keywords) || []).slice(0,3).map(k => `<span class="kw">${k}</span>`).join('')
+            || '<span class="kw">기록 없음</span>';
+    }
+
     function closeReminder() {
         document.getElementById('backdrop').classList.remove('show');
         document.getElementById('reminderModal').classList.remove('show');
@@ -533,18 +590,19 @@
         document.getElementById('statusView').innerHTML = `
             <div class="hospital-card"><div class="card-top"><h3>관리 거래처</h3><span class="point-tag">${hospitals.length}곳</span></div><p class="doctor">면담 포인트 등록된 활성 거래처</p></div>
             <div class="hospital-card"><div class="card-top"><h3>이번 달 경비</h3><span class="point-tag">${monthExp.toLocaleString('ko-KR')}원</span></div><p class="doctor">${new Date().getMonth()+1}월 누적 사용액</p></div>
-            <div class="hospital-card"><div class="card-top"><h3>면담 대기</h3><span class="point-tag">${hospitals.filter(h=>h.keywords&&h.keywords.length).length}건</span></div><p class="doctor">브리핑 준비된 거래처</p></div>
+            <div class="hospital-card"><div class="card-top"><h3>면담 대기</h3><span class="point-tag">${hospitals.filter(h=>(h.officials||[]).some(o=>o.keywords&&o.keywords.length)).length}건</span></div><p class="doctor">브리핑 준비된 거래처</p></div>
         `;
     }
 
     document.getElementById('searchBox').addEventListener('input', e => {
         const q = e.target.value.trim().toLowerCase();
-        const res = hospitals.filter(h => h.name.toLowerCase().includes(q) || h.doctor.toLowerCase().includes(q));
+        const res = hospitals.filter(h => h.name.toLowerCase().includes(q)
+            || (h.officials||[]).some(o => (o.doctor_name||'').toLowerCase().includes(q)));
         document.getElementById('searchResult').innerHTML = q === '' ? '' :
             (res.length ? res.map(h => `
                 <div class="hospital-card" onclick="showReminder(${h.id})">
                     <div class="card-top"><h3>${h.name}</h3></div>
-                    <p class="doctor">${h.doctor}</p>
+                    <p class="doctor">${(h.officials||[]).map(doctorLabel).join(' / ') || '담당의 미등록'}</p>
                 </div>`).join('') : '<div class="empty">검색 결과가 없습니다</div>');
     });
 
