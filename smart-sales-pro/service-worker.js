@@ -1,9 +1,9 @@
-const CACHE = 'ssp-v1';
+const CACHE = 'ssp-v2';
 const ASSETS = [
   './',
   './index.html',
   './manifest.json',
-  'https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css'
+  './vendor/supabase.js'
 ];
 
 // 설치: 정적 자산 캐싱

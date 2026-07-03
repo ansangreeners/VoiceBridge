@@ -10,8 +10,14 @@ smart-sales-pro/
 ├── manifest.json       # PWA 매니페스트
 ├── service-worker.js   # 오프라인 캐싱
 ├── supabase_schema.sql # DB 테이블 생성 SQL
+├── vendor/
+│   └── supabase.js     # Supabase JS UMD 번들 (로컬, CDN 의존 없음)
 └── README.md           # 이 파일
 ```
+
+## CDN 의존 제거됨
+- Supabase JS는 `vendor/supabase.js` 로컬 번들 사용 → 사내망/오프라인/CDN 차단 환경에서도 로드
+- 폰트는 Pretendard 우선 + 시스템 한글폰트(Apple SD Gothic Neo/맑은 고딕/Noto Sans KR) 폴백 → Pretendard CDN이 막혀도 한글이 깨지지 않음
 
 ## 로컬 실행 (SW·localStorage 검증하려면 반드시 http 서버로)
 ```bash
