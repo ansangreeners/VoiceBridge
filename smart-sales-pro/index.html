@@ -238,7 +238,7 @@
                 <h1 id="pageTitle">영업 현황</h1>
                 <div class="sub" id="pageSub">거래처를 눌러 면담 브리핑을 확인하세요</div>
             </div>
-            <button class="btn-primary" id="headerAction">✍️ 새 일보</button>
+            <button class="btn-primary" id="headerAction" onclick="openDailyLogModal()">✍️ 새 일보</button>
         </header>
 
         <div class="content">
@@ -247,6 +247,7 @@
                 <div class="data-banner mock" id="dataBanner">
                     <span>●</span><span id="bannerText">Mock 모드 — Supabase 키 입력 시 실 DB 연동</span>
                 </div>
+                <button class="btn-ghost" style="margin-bottom:14px;" onclick="openHospitalModal()">＋ 거래처 추가</button>
                 <div id="hospitalList"></div>
             </section>
 
@@ -284,7 +285,7 @@
     </main>
 
     <!-- 면담 1분 전 모달 -->
-    <div class="backdrop" id="backdrop" onclick="closeReminder()"></div>
+    <div class="backdrop" id="backdrop" onclick="closeModal()"></div>
     <div class="modal" id="reminderModal">
         <div class="reminder-badge">⚡ 면담 1분 전</div>
         <h2 class="modal-title" id="rmName"></h2>
@@ -298,6 +299,32 @@
         <div id="rmChart"></div>
 
         <button class="btn-close" onclick="closeReminder()">브리핑 완료 · 면담 시작</button>
+    </div>
+
+    <!-- 거래처 추가 모달 -->
+    <div class="modal" id="hospitalModal">
+        <h2 class="modal-title">＋ 거래처 추가</h2>
+        <p class="modal-sub">병원/의원 정보를 등록하세요</p>
+        <div class="expense-form" style="box-shadow:none;border:none;padding:0;">
+            <input id="hospName" placeholder="병원명 (필수)">
+            <input id="hospDoctor" placeholder="담당의명 (예: 김철수 과장)">
+            <input id="hospDept" placeholder="진료과 (예: 내과)">
+            <input id="hospKeywords" placeholder="면담 키워드 (콤마로 구분, 예: 가격,납기)">
+        </div>
+        <button class="btn-close" onclick="submitHospital()">거래처 저장</button>
+        <button class="btn-ghost" onclick="closeHospitalModal()">취소</button>
+    </div>
+
+    <!-- 새 일보 모달 -->
+    <div class="modal" id="dailyLogModal">
+        <h2 class="modal-title">✍️ 새 일보</h2>
+        <p class="modal-sub">면담 내용을 기록하세요</p>
+        <div class="expense-form" style="box-shadow:none;border:none;padding:0;">
+            <select id="logHospital"></select>
+            <textarea id="logNote" rows="4" placeholder="면담 메모 (예: 가격 문의, 다음달 재방문 예정)" style="width:100%;padding:12px 14px;border:1px solid var(--color-line);border-radius:10px;font-size:14px;font-family:inherit;background:#F8FAFC;resize:vertical;"></textarea>
+        </div>
+        <button class="btn-close" onclick="submitDailyLog()">일보 저장</button>
+        <button class="btn-ghost" onclick="closeDailyLogModal()">취소</button>
     </div>
 
     <script>
@@ -361,6 +388,17 @@
 
     let hospitals = [];
 
+    /* 미연동 시 거래처 추가/삭제/일보가 새로고침에도 남도록 localStorage에 보관.
+       최초 1회는 MOCK 샘플로 초기화하고, 이후에는 저장된 값이 항상 우선한다. */
+    const HOSP_KEY = 'ssp_local_hospitals';
+    function getLocalHospitals() {
+        let stored = null;
+        try { stored = JSON.parse(localStorage.getItem(HOSP_KEY)); } catch {}
+        if (!stored) { stored = JSON.parse(JSON.stringify(MOCK)); saveLocalHospitals(stored); }
+        return stored;
+    }
+    function saveLocalHospitals(arr) { localStorage.setItem(HOSP_KEY, JSON.stringify(arr)); }
+
     async function loadHospitals() {
         if (LIVE) {
             try {
@@ -389,9 +427,84 @@
                 hospitals = MOCK; setBanner(false, true);
             }
         } else {
-            hospitals = MOCK; setBanner(false);
+            hospitals = getLocalHospitals(); setBanner(false);
         }
         renderHospitals();
+    }
+
+    async function addHospital(name, doctorName, department, keywordsCSV) {
+        const keywords = keywordsCSV.split(',').map(k => k.trim()).filter(Boolean);
+        const official = { doctor_name: doctorName, department, keywords };
+        if (LIVE) {
+            try {
+                const { data: hRows, error: hErr } = await sb.from('hospitals').insert({ name }).select();
+                if (hErr) throw hErr;
+                const hospitalId = hRows[0].id;
+                if (doctorName || department || keywords.length) {
+                    const { error: oErr } = await sb.from('officials').insert({ hospital_id: hospitalId, ...official });
+                    if (oErr) throw oErr;
+                }
+                await loadHospitals();
+            } catch (e) {
+                console.warn('거래처 Supabase 저장 실패:', e.message);
+                alert('거래처 저장에 실패했습니다: ' + e.message);
+                return false;
+            }
+        } else {
+            const local = getLocalHospitals();
+            local.push({
+                id: Date.now(), name, last_note: '기록 없음',
+                officials: (doctorName || department || keywords.length) ? [official] : [],
+                chart: []
+            });
+            saveLocalHospitals(local);
+            hospitals = local;
+            renderHospitals();
+        }
+        return true;
+    }
+
+    async function deleteHospital(id) {
+        if (!confirm('이 거래처를 삭제할까요? 담당의·일보 기록도 함께 삭제됩니다.')) return;
+        if (LIVE) {
+            try {
+                const { error } = await sb.from('hospitals').delete().eq('id', id);
+                if (error) throw error;
+                await loadHospitals();
+            } catch (e) {
+                console.warn('거래처 Supabase 삭제 실패:', e.message);
+                alert('거래처 삭제에 실패했습니다: ' + e.message);
+                return;
+            }
+        } else {
+            const local = getLocalHospitals().filter(h => h.id !== id);
+            saveLocalHospitals(local);
+            hospitals = local;
+            renderHospitals();
+        }
+    }
+
+    async function addDailyLog(hospitalId, note) {
+        if (LIVE) {
+            try {
+                const { error } = await sb.from('daily_logs').insert({ hospital_id: hospitalId, note });
+                if (error) throw error;
+            } catch (e) {
+                console.warn('일보 Supabase 저장 실패:', e.message);
+                alert('일보 저장에 실패했습니다: ' + e.message);
+                return false;
+            }
+            const h = hospitals.find(x => x.id === hospitalId);
+            if (h) h.last_note = note;
+        } else {
+            const local = getLocalHospitals();
+            const h = local.find(x => x.id === hospitalId);
+            if (h) h.last_note = note;
+            saveLocalHospitals(local);
+            hospitals = local;
+        }
+        renderHospitals();
+        return true;
     }
 
     function setBanner(live, fallback) {
@@ -419,13 +532,31 @@
             <div class="hospital-card" onclick="showReminder(${h.id})">
                 <div class="card-top">
                     <h3>${h.name}</h3>
-                    ${keywordCount ? '<span class="point-tag">면담 포인트 '+keywordCount+'</span>' : ''}
+                    <div style="display:flex;align-items:center;gap:6px;">
+                        ${keywordCount ? '<span class="point-tag">면담 포인트 '+keywordCount+'</span>' : ''}
+                        <button class="del-btn" onclick="event.stopPropagation(); deleteHospital(${h.id})">✕</button>
+                    </div>
                 </div>
                 <p class="doctor">${doctorLine}</p>
                 <p class="last-note">📌 ${h.last_note}</p>
             </div>
         `;
         }).join('');
+    }
+
+    /* =========================================================
+       모달 공용 열기/닫기 (리마인더 / 거래처 추가 / 새 일보)
+    ========================================================= */
+    let openModalId = null;
+    function openModal(id) {
+        document.getElementById('backdrop').classList.add('show');
+        document.getElementById(id).classList.add('show');
+        openModalId = id;
+    }
+    function closeModal() {
+        if (openModalId) document.getElementById(openModalId).classList.remove('show');
+        document.getElementById('backdrop').classList.remove('show');
+        openModalId = null;
     }
 
     /* =========================================================
@@ -456,8 +587,7 @@
               </div>`;
         }).join('') || '<div class="empty" style="padding:16px 0">비교 데이터 없음</div>';
 
-        document.getElementById('backdrop').classList.add('show');
-        document.getElementById('reminderModal').classList.add('show');
+        openModal('reminderModal');
     }
 
     function renderDocTabs(officials, activeIdx) {
@@ -487,9 +617,48 @@
             || '<span class="kw">기록 없음</span>';
     }
 
-    function closeReminder() {
-        document.getElementById('backdrop').classList.remove('show');
-        document.getElementById('reminderModal').classList.remove('show');
+    function closeReminder() { closeModal(); }
+
+    /* =========================================================
+       거래처 추가 모달
+    ========================================================= */
+    function openHospitalModal() {
+        document.getElementById('hospName').value = '';
+        document.getElementById('hospDoctor').value = '';
+        document.getElementById('hospDept').value = '';
+        document.getElementById('hospKeywords').value = '';
+        openModal('hospitalModal');
+    }
+    function closeHospitalModal() { closeModal(); }
+
+    async function submitHospital() {
+        const name = document.getElementById('hospName').value.trim();
+        if (!name) { alert('병원명을 입력하세요'); return; }
+        const doctorName = document.getElementById('hospDoctor').value.trim();
+        const department = document.getElementById('hospDept').value.trim();
+        const keywordsCSV = document.getElementById('hospKeywords').value.trim();
+        const ok = await addHospital(name, doctorName, department, keywordsCSV);
+        if (ok) closeModal();
+    }
+
+    /* =========================================================
+       새 일보 모달
+    ========================================================= */
+    function openDailyLogModal() {
+        const sel = document.getElementById('logHospital');
+        if (!hospitals.length) { alert('먼저 거래처를 등록하세요'); return; }
+        sel.innerHTML = hospitals.map(h => `<option value="${h.id}">${h.name}</option>`).join('');
+        document.getElementById('logNote').value = '';
+        openModal('dailyLogModal');
+    }
+    function closeDailyLogModal() { closeModal(); }
+
+    async function submitDailyLog() {
+        const hospitalId = Number(document.getElementById('logHospital').value);
+        const note = document.getElementById('logNote').value.trim();
+        if (!note) { alert('면담 메모를 입력하세요'); return; }
+        const ok = await addDailyLog(hospitalId, note);
+        if (ok) closeModal();
     }
 
     /* =========================================================
