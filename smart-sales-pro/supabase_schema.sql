@@ -27,13 +27,29 @@ create table daily_logs (
   created_at timestamptz default now()
 );
 
+-- 4. 경비 (expenses) — localStorage 대체, 기기 교체에도 유지
+create table expenses (
+  id bigint generated always as identity primary key,
+  hospital_id bigint references hospitals(id) on delete set null,
+  category text not null,
+  memo text,
+  amount integer not null check (amount > 0),
+  expense_date date not null,
+  created_at timestamptz default now()
+);
+
 -- RLS (개인 사용 시 anon 읽기 허용 예시 — 운영 시 auth 기반으로 강화 권장)
 alter table hospitals enable row level security;
 alter table officials enable row level security;
 alter table daily_logs enable row level security;
+alter table expenses enable row level security;
 create policy "anon read hospitals" on hospitals for select using (true);
 create policy "anon read officials" on officials for select using (true);
 create policy "anon read logs" on daily_logs for select using (true);
+-- expenses 는 앱에서 anon key로 직접 추가/삭제하므로 CRUD 전체 허용
+create policy "anon read expenses" on expenses for select using (true);
+create policy "anon insert expenses" on expenses for insert with check (true);
+create policy "anon delete expenses" on expenses for delete using (true);
 
 -- 샘플 데이터
 insert into hospitals (name, chart) values

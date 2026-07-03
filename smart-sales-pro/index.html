@@ -492,37 +492,104 @@
     }
 
     /* =========================================================
-       3. 경비 관리 (localStorage)
+       3. 경비 관리
+       Live 연동 시 Supabase expenses 테이블에 저장, 미연동 시
+       localStorage 폴백. Live 최초 연결 시 기존 localStorage 경비를
+       expenses 테이블로 1회 승격(migration) 후 로컬 데이터는 비움.
+       내부 표현은 항상 { id, cat, memo, amt, date } 로 통일.
     ========================================================= */
     const EXP_KEY = 'ssp_expenses';
-    function getExpenses() {
+    let expenses = [];
+
+    function getLocalExpenses() {
         try { return JSON.parse(localStorage.getItem(EXP_KEY)) || []; }
         catch { return []; }
     }
-    function saveExpenses(arr) { localStorage.setItem(EXP_KEY, JSON.stringify(arr)); }
+    function saveLocalExpenses(arr) { localStorage.setItem(EXP_KEY, JSON.stringify(arr)); }
 
-    function addExpense() {
+    function fromRow(row) { return { id: row.id, cat: row.category, memo: row.memo, amt: row.amount, date: row.expense_date }; }
+    function toRow(e) { return { category: e.cat, memo: e.memo, amount: e.amt, expense_date: e.date }; }
+
+    async function migrateLocalExpensesIfNeeded() {
+        if (!LIVE) return;
+        const local = getLocalExpenses();
+        if (!local.length) return;
+        try {
+            const { error } = await sb.from('expenses').insert(local.map(toRow));
+            if (error) throw error;
+            localStorage.removeItem(EXP_KEY);
+        } catch (e) {
+            console.warn('로컬 경비 Supabase 승격 실패 (다음 접속 시 재시도):', e.message);
+        }
+    }
+
+    async function loadExpenses() {
+        if (LIVE) {
+            await migrateLocalExpensesIfNeeded();
+            try {
+                const { data, error } = await sb.from('expenses').select('*').order('expense_date', { ascending: false });
+                if (error) throw error;
+                expenses = (data || []).map(fromRow);
+            } catch (e) {
+                console.warn('경비 Supabase 로드 실패, localStorage 폴백:', e.message);
+                expenses = getLocalExpenses();
+            }
+        } else {
+            expenses = getLocalExpenses();
+        }
+        renderExpenses();
+    }
+
+    async function addExpense() {
         const cat = document.getElementById('expCat').value;
         const memo = document.getElementById('expMemo').value.trim();
         const amt = parseInt(document.getElementById('expAmt').value, 10);
         const date = document.getElementById('expDate').value;
         if (!amt || amt <= 0) { alert('금액을 입력하세요'); return; }
         if (!date) { alert('날짜를 선택하세요'); return; }
-        const arr = getExpenses();
-        arr.push({ id: Date.now(), cat, memo: memo || cat, amt, date });
-        saveExpenses(arr);
+        const entry = { cat, memo: memo || cat, amt, date };
+
+        if (LIVE) {
+            try {
+                const { data, error } = await sb.from('expenses').insert(toRow(entry)).select();
+                if (error) throw error;
+                expenses.push(fromRow(data[0]));
+            } catch (e) {
+                console.warn('경비 Supabase 저장 실패:', e.message);
+                alert('경비 저장에 실패했습니다: ' + e.message);
+                return;
+            }
+        } else {
+            const local = getLocalExpenses();
+            const saved = { id: Date.now(), ...entry };
+            local.push(saved);
+            saveLocalExpenses(local);
+            expenses.push(saved);
+        }
         document.getElementById('expMemo').value = '';
         document.getElementById('expAmt').value = '';
         renderExpenses();
     }
-    function delExpense(id) {
-        saveExpenses(getExpenses().filter(e => e.id !== id));
+    async function delExpense(id) {
+        if (LIVE) {
+            try {
+                const { error } = await sb.from('expenses').delete().eq('id', id);
+                if (error) throw error;
+            } catch (e) {
+                console.warn('경비 Supabase 삭제 실패:', e.message);
+                alert('경비 삭제에 실패했습니다: ' + e.message);
+                return;
+            }
+        } else {
+            saveLocalExpenses(getLocalExpenses().filter(e => e.id !== id));
+        }
+        expenses = expenses.filter(e => e.id !== id);
         renderExpenses();
     }
     function fmt(n) { return n.toLocaleString('ko-KR') + '원'; }
 
     function renderExpenses() {
-        const arr = getExpenses().sort((a,b) => b.date.localeCompare(a.date) || b.id - a.id);
+        const arr = [...expenses].sort((a,b) => b.date.localeCompare(a.date) || b.id - a.id);
         const now = new Date();
         const ym = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0');
         const monthSum = arr.filter(e => e.date.startsWith(ym)).reduce((s,e) => s+e.amt, 0);
@@ -583,7 +650,7 @@
     });
 
     function renderStatus() {
-        const exp = getExpenses();
+        const exp = expenses;
         const now = new Date();
         const ym = now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
         const monthExp = exp.filter(e=>e.date.startsWith(ym)).reduce((s,e)=>s+e.amt,0);
@@ -609,7 +676,7 @@
     /* 초기화 */
     document.getElementById('expDate').value = new Date().toISOString().slice(0,10);
     loadHospitals();
-    renderExpenses();
+    loadExpenses();
 
     /* 4. Service Worker 등록 (배포 환경 전용) */
     if ('serviceWorker' in navigator) {
