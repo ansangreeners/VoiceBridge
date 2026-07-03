@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#1E3A8A">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Smart Sales Pro">
+    <title>Smart Sales Pro</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect width='192' height='192' rx='42' fill='%231E3A8A'/%3E%3Ctext x='96' y='128' font-size='104' font-weight='800' fill='white' text-anchor='middle' font-family='Arial'%3ES%3C/text%3E%3C/svg%3E">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root {
+            --color-brand: #1E3A8A;
+            --color-brand-soft: #DBEAFE;
+            --color-accent: #10B981;
+            --color-accent-soft: #D1FAE5;
+            --color-bg: #F1F5F9;
+            --color-surface: #FFFFFF;
+            --color-muted: #64748B;
+            --color-line: #E2E8F0;
+            --sidebar-width: 76px;
+            --radius-sm: 10px;
+            --radius-md: 16px;
+            --radius-lg: 22px;
+            --shadow-soft: 0 8px 24px -8px rgba(15,23,42,0.12);
+            --shadow-pop: 0 24px 48px -12px rgba(15,23,42,0.22);
+        }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        html, body { margin: 0; height: 100%; }
+        body {
+            font-family: 'Pretendard', sans-serif;
+            background: var(--color-bg);
+            display: flex;
+            height: 100vh;
+            height: 100dvh;
+            color: #0F172A;
+            padding-top: env(safe-area-inset-top);
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+
+        /* 사이드바 */
+        .sidebar {
+            width: var(--sidebar-width);
+            background: var(--color-surface);
+            border-right: 1px solid var(--color-line);
+            display: flex; flex-direction: column;
+            align-items: center; padding: 18px 0 12px;
+            flex-shrink: 0;
+        }
+        .brand-dot {
+            width: 40px; height: 40px; border-radius: 12px;
+            background: linear-gradient(135deg, var(--color-brand), #2563EB);
+            color: #fff; display: flex; align-items: center; justify-content: center;
+            font-weight: 800; font-size: 18px; margin-bottom: 22px;
+            box-shadow: var(--shadow-soft);
+        }
+        .nav-item {
+            width: 56px; padding: 9px 0; border-radius: var(--radius-sm);
+            display: flex; flex-direction: column; align-items: center;
+            gap: 3px; margin-bottom: 10px; cursor: pointer;
+            color: #94A3B8; font-size: 10.5px; font-weight: 700;
+            transition: background .18s, color .18s;
+        }
+        .nav-item i { font-size: 20px; font-style: normal; }
+        .nav-item.active { background: var(--color-brand-soft); color: var(--color-brand); }
+        .nav-item:active { transform: scale(.94); }
+
+        /* 메인 */
+        .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+        .header {
+            padding: 18px 22px; background: rgba(255,255,255,.85);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--color-line);
+            display: flex; justify-content: space-between; align-items: center;
+            flex-shrink: 0;
+        }
+        .header h1 { margin: 0; font-size: 20px; font-weight: 800; letter-spacing: -.4px; }
+        .header .sub { font-size: 12px; color: var(--color-muted); font-weight: 600; margin-top: 2px; }
+        .btn-primary {
+            background: var(--color-brand); color: #fff; border: none;
+            padding: 11px 18px; border-radius: 10px; font-weight: 700;
+            font-size: 13px; cursor: pointer; box-shadow: var(--shadow-soft);
+        }
+        .btn-primary:active { transform: scale(.96); }
+        .content { flex: 1; overflow-y: auto; padding: 20px; -webkit-overflow-scrolling: touch; }
+        .page { display: none; }
+        .page.active { display: block; animation: fade .25s ease; }
+        @keyframes fade { from { opacity: 0; transform: translateY(6px);} to {opacity:1; transform:none;} }
+
+        /* 상태 배너 */
+        .data-banner {
+            font-size: 12px; font-weight: 600; padding: 8px 14px;
+            border-radius: 10px; margin-bottom: 16px; display: flex;
+            align-items: center; gap: 8px;
+        }
+        .data-banner.mock { background: #FEF3C7; color: #92400E; }
+        .data-banner.live { background: var(--color-accent-soft); color: #065F46; }
+
+        /* 거래처 카드 */
+        .hospital-card {
+            background: var(--color-surface); border-radius: var(--radius-md);
+            padding: 18px; box-shadow: var(--shadow-soft); margin-bottom: 14px;
+            border: 1px solid var(--color-line); cursor: pointer;
+            transition: transform .18s, border-color .18s;
+        }
+        .hospital-card:hover { transform: translateY(-2px); border-color: var(--color-brand); }
+        .hospital-card:active { transform: scale(.99); }
+        .card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+        .card-top h3 { margin: 0; font-size: 16px; font-weight: 800; }
+        .doctor { color: var(--color-muted); margin: 7px 0 4px; font-size: 13px; font-weight: 600; }
+        .last-note { font-size: 12.5px; color: #94A3B8; margin: 0; }
+        .point-tag {
+            background: var(--color-accent-soft); color: #065F46; padding: 5px 11px;
+            border-radius: 999px; font-size: 11px; font-weight: 800; white-space: nowrap;
+        }
+
+        /* 모달 공통 */
+        .backdrop {
+            position: fixed; inset: 0; background: rgba(15,23,42,.42);
+            backdrop-filter: blur(3px); z-index: 900; display: none;
+        }
+        .backdrop.show { display: block; }
+        .modal {
+            position: fixed; top: 50%; left: 50%;
+            transform: translate(-50%, -50%) scale(.96);
+            width: calc(100% - 40px); max-width: 420px;
+            background: #fff; border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-pop); z-index: 1000; padding: 24px;
+            display: none; max-height: 86vh; overflow-y: auto;
+            animation: pop .22s cubic-bezier(.2,.8,.3,1) forwards;
+        }
+        .modal.show { display: block; }
+        @keyframes pop { to { transform: translate(-50%,-50%) scale(1);} }
+        .modal-title { margin: 0 0 4px; font-size: 18px; font-weight: 800; }
+        .modal-sub { margin: 0 0 18px; font-size: 13px; color: var(--color-muted); font-weight:600;}
+
+        .reminder-badge {
+            display: inline-flex; align-items: center; gap: 6px;
+            color: var(--color-accent); font-weight: 800; font-size: 15px;
+            margin-bottom: 4px;
+        }
+        .kw-wrap { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 18px; }
+        .kw {
+            background: var(--color-brand-soft); color: var(--color-brand);
+            padding: 7px 13px; border-radius: 999px; font-size: 12.5px; font-weight: 800;
+        }
+        .section-label { font-size: 12px; font-weight: 800; color: var(--color-muted); margin: 4px 0 10px; text-transform: uppercase; letter-spacing: .5px;}
+
+        /* 제품 비교 차트 */
+        .cmp-row { margin-bottom: 12px; }
+        .cmp-head { display: flex; justify-content: space-between; font-size: 12.5px; font-weight: 700; margin-bottom: 5px; }
+        .cmp-head .ours { color: var(--color-brand); }
+        .cmp-head .theirs { color: #94A3B8; }
+        .cmp-bar { height: 9px; border-radius: 999px; background: #EEF2F7; overflow: hidden; display: flex; }
+        .cmp-bar .ours-fill { background: linear-gradient(90deg,#2563EB,#1E3A8A); }
+        .cmp-bar .theirs-fill { background: #CBD5E1; }
+        .cmp-metric { font-size: 12px; font-weight: 700; color: #475569; margin-bottom: 8px; }
+
+        .btn-close {
+            width: 100%; padding: 14px; background: var(--color-brand); color: #fff;
+            border: none; border-radius: 12px; font-weight: 800; font-size: 14px;
+            margin-top: 8px; cursor: pointer;
+        }
+        .btn-close:active { transform: scale(.97); }
+        .btn-ghost {
+            width: 100%; padding: 13px; background: #F1F5F9; color: #475569;
+            border: none; border-radius: 12px; font-weight: 700; font-size: 13px;
+            margin-top: 8px; cursor: pointer;
+        }
+
+        /* 경비 */
+        .expense-summary {
+            background: linear-gradient(135deg, var(--color-brand), #2563EB);
+            color: #fff; border-radius: var(--radius-md); padding: 22px;
+            box-shadow: var(--shadow-soft); margin-bottom: 18px;
+        }
+        .expense-summary .label { font-size: 12.5px; opacity: .85; font-weight: 600; }
+        .expense-summary .total { font-size: 32px; font-weight: 800; margin: 4px 0 0; letter-spacing: -1px; }
+        .expense-form {
+            background: #fff; border-radius: var(--radius-md); padding: 16px;
+            box-shadow: var(--shadow-soft); border: 1px solid var(--color-line);
+            margin-bottom: 18px;
+        }
+        .expense-form input, .expense-form select {
+            width: 100%; padding: 12px 14px; border: 1px solid var(--color-line);
+            border-radius: 10px; font-size: 14px; font-family: inherit; margin-bottom: 10px;
+            background: #F8FAFC;
+        }
+        .expense-form input:focus, .expense-form select:focus { outline: 2px solid var(--color-brand-soft); border-color: var(--color-brand); }
+        .day-group { margin-bottom: 16px; }
+        .day-head { display: flex; justify-content: space-between; font-size: 13px; font-weight: 800; color: #334155; margin-bottom: 8px; padding: 0 4px; }
+        .day-head .day-sum { color: var(--color-brand); }
+        .expense-item {
+            background: #fff; border-radius: 12px; padding: 13px 15px;
+            display: flex; justify-content: space-between; align-items: center;
+            box-shadow: var(--shadow-soft); margin-bottom: 8px; border: 1px solid var(--color-line);
+        }
+        .expense-item .cat { font-size: 11px; font-weight: 800; color: var(--color-brand); background: var(--color-brand-soft); padding: 3px 9px; border-radius: 999px; }
+        .expense-item .memo { font-size: 13.5px; font-weight: 700; margin: 0 0 2px; }
+        .expense-item .amt { font-size: 15px; font-weight: 800; }
+        .del-btn { background: none; border: none; color: #CBD5E1; font-size: 18px; cursor: pointer; padding: 0 4px; }
+        .del-btn:active { color: #EF4444; }
+        .empty { text-align: center; color: #94A3B8; font-size: 13px; padding: 40px 0; font-weight: 600; }
+
+        @media (max-width: 480px) {
+            .header h1 { font-size: 18px; }
+            .expense-summary .total { font-size: 28px; }
+        }
+    </style>
+</head>
+<body>
+    <nav class="sidebar">
+        <div class="brand-dot">S</div>
+        <div class="nav-item active" data-page="daily"><i>💬</i>일보</div>
+        <div class="nav-item" data-page="status"><i>📊</i>현황</div>
+        <div class="nav-item" data-page="search"><i>🔍</i>검색</div>
+        <div class="nav-item" data-page="expense"><i>💰</i>경비</div>
+    </nav>
+
+    <main class="main">
+        <header class="header">
+            <div>
+                <h1 id="pageTitle">영업 현황</h1>
+                <div class="sub" id="pageSub">거래처를 눌러 면담 브리핑을 확인하세요</div>
+            </div>
+            <button class="btn-primary" id="headerAction">✍️ 새 일보</button>
+        </header>
+
+        <div class="content">
+            <!-- 일보/현황: 거래처 리스트 -->
+            <section class="page active" id="page-daily">
+                <div class="data-banner mock" id="dataBanner">
+                    <span>●</span><span id="bannerText">Mock 모드 — Supabase 키 입력 시 실 DB 연동</span>
+                </div>
+                <div id="hospitalList"></div>
+            </section>
+
+            <section class="page" id="page-status">
+                <div id="statusView"></div>
+            </section>
+
+            <section class="page" id="page-search">
+                <input id="searchBox" placeholder="병원 / 의사명 검색" style="width:100%;padding:13px 16px;border:1px solid var(--color-line);border-radius:12px;font-size:14px;font-family:inherit;margin-bottom:16px;background:#fff;box-shadow:var(--shadow-soft);">
+                <div id="searchResult"></div>
+            </section>
+
+            <!-- 경비 -->
+            <section class="page" id="page-expense">
+                <div class="expense-summary">
+                    <div class="label">이번 달 총 경비</div>
+                    <div class="total" id="monthTotal">0원</div>
+                </div>
+                <div class="expense-form">
+                    <select id="expCat">
+                        <option value="식대">식대</option>
+                        <option value="교통">교통비</option>
+                        <option value="접대">거래처 접대</option>
+                        <option value="주유">주유비</option>
+                        <option value="기타">기타</option>
+                    </select>
+                    <input id="expMemo" placeholder="사용처 / 메모 (예: 서울중앙병원 점심)">
+                    <input id="expAmt" type="number" inputmode="numeric" placeholder="금액 (원)">
+                    <input id="expDate" type="date">
+                    <button class="btn-primary" style="width:100%;padding:13px;" onclick="addExpense()">＋ 경비 추가</button>
+                </div>
+                <div id="expenseList"></div>
+            </section>
+        </div>
+    </main>
+
+    <!-- 면담 1분 전 모달 -->
+    <div class="backdrop" id="backdrop" onclick="closeReminder()"></div>
+    <div class="modal" id="reminderModal">
+        <div class="reminder-badge">⚡ 면담 1분 전</div>
+        <h2 class="modal-title" id="rmName"></h2>
+        <p class="modal-sub" id="rmDoctor"></p>
+
+        <div class="section-label">🔑 과거 상담 핵심 키워드</div>
+        <div class="kw-wrap" id="rmKeywords"></div>
+
+        <div class="section-label">📊 제품 비교 차트</div>
+        <div id="rmChart"></div>
+
+        <button class="btn-close" onclick="closeReminder()">브리핑 완료 · 면담 시작</button>
+    </div>
+
+    <script>
+    /* =========================================================
+       1. Supabase 설정
+       배포 시 아래 두 값만 채우면 실 DB 연동됩니다.
+       테이블: hospitals / officials / daily_logs
+       비어있으면 자동으로 mock 데이터로 폴백합니다.
+    ========================================================= */
+    const SUPABASE_URL = "";   // 예: https://xxxx.supabase.co
+    const SUPABASE_KEY = "";   // anon public key
+
+    let sb = null;
+    let LIVE = false;
+    if (SUPABASE_URL && SUPABASE_KEY && window.supabase) {
+        sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        LIVE = true;
+    }
+
+    /* Mock 데이터 (아티팩트 미리보기 / 미연동 시) */
+    const MOCK = [
+        {
+            id: 1, name: "서울중앙병원", doctor: "김철수 과장 · 내과",
+            last_note: "지난번 경쟁사 A제품 언급, 가격 민감",
+            keywords: ["가격 경쟁력", "부작용 우려", "월 처방량 확대"],
+            chart: [
+                { metric: "약가 대비 효율", ours: 92, theirs: 70 },
+                { metric: "부작용 발생률(낮을수록↑)", ours: 88, theirs: 62 },
+                { metric: "복용 편의성", ours: 80, theirs: 75 }
+            ]
+        },
+        {
+            id: 2, name: "수원성모의원", doctor: "박영희 원장 · 가정의학",
+            last_note: "수액제 재고 이슈, 납기 확인 요청",
+            keywords: ["납기 안정성", "IV 수액 단가", "묶음 발주"],
+            chart: [
+                { metric: "납기 신뢰도", ours: 95, theirs: 68 },
+                { metric: "단가 경쟁력", ours: 78, theirs: 82 },
+                { metric: "제품 라인업", ours: 90, theirs: 60 }
+            ]
+        },
+        {
+            id: 3, name: "안성365의원", doctor: "이준호 원장 · 정형외과",
+            last_note: "영양수액 신제품 관심, 임상 데이터 요청",
+            keywords: ["임상 근거", "영양수액", "샘플 요청"],
+            chart: [
+                { metric: "임상 데이터 충실도", ours: 90, theirs: 55 },
+                { metric: "가격", ours: 72, theirs: 80 },
+                { metric: "브랜드 신뢰", ours: 85, theirs: 70 }
+            ]
+        }
+    ];
+
+    let hospitals = [];
+
+    async function loadHospitals() {
+        if (LIVE) {
+            try {
+                // hospitals 테이블 + 담당 official + 최근 daily_log 조인 예시
+                const { data, error } = await sb
+                    .from('hospitals')
+                    .select(`
+                        id, name,
+                        officials ( doctor_name, department, keywords ),
+                        daily_logs ( note, created_at )
+                    `)
+                    .order('created_at', { foreignTable: 'daily_logs', ascending: false });
+                if (error) throw error;
+                hospitals = (data || []).map(h => {
+                    const off = (h.officials && h.officials[0]) || {};
+                    const log = (h.daily_logs && h.daily_logs[0]) || {};
+                    return {
+                        id: h.id, name: h.name,
+                        doctor: `${off.doctor_name || ''} ${off.department ? '· ' + off.department : ''}`,
+                        last_note: log.note || '기록 없음',
+                        keywords: off.keywords || [],
+                        chart: h.chart || []
+                    };
+                });
+                setBanner(true);
+            } catch (e) {
+                console.warn('Supabase 로드 실패, mock 폴백:', e.message);
+                hospitals = MOCK; setBanner(false, true);
+            }
+        } else {
+            hospitals = MOCK; setBanner(false);
+        }
+        renderHospitals();
+    }
+
+    function setBanner(live, fallback) {
+        const b = document.getElementById('dataBanner');
+        const t = document.getElementById('bannerText');
+        if (live) { b.className = 'data-banner live'; t.textContent = 'Live — Supabase 실 DB 연동됨'; }
+        else if (fallback) { b.className = 'data-banner mock'; t.textContent = 'Supabase 연결 실패 — Mock 데이터 표시 중'; }
+        else { b.className = 'data-banner mock'; t.textContent = 'Mock 모드 — 배포 후 Supabase 키 입력 시 실 DB 연동'; }
+    }
+
+    function renderHospitals() {
+        const list = document.getElementById('hospitalList');
+        if (!hospitals.length) { list.innerHTML = '<div class="empty">등록된 거래처가 없습니다</div>'; return; }
+        list.innerHTML = hospitals.map(h => `
+            <div class="hospital-card" onclick="showReminder(${h.id})">
+                <div class="card-top">
+                    <h3>${h.name}</h3>
+                    ${h.keywords && h.keywords.length ? '<span class="point-tag">면담 포인트 '+h.keywords.length+'</span>' : ''}
+                </div>
+                <p class="doctor">${h.doctor}</p>
+                <p class="last-note">📌 ${h.last_note}</p>
+            </div>
+        `).join('');
+    }
+
+    /* =========================================================
+       2. 면담 1분 전 리마인더 (키워드 3개 + 비교 차트)
+    ========================================================= */
+    function showReminder(id) {
+        const h = hospitals.find(x => x.id === id);
+        if (!h) return;
+        document.getElementById('rmName').textContent = h.name;
+        document.getElementById('rmDoctor').textContent = h.doctor;
+
+        document.getElementById('rmKeywords').innerHTML =
+            (h.keywords || []).slice(0,3).map(k => `<span class="kw">${k}</span>`).join('')
+            || '<span class="kw">기록 없음</span>';
+
+        document.getElementById('rmChart').innerHTML = (h.chart || []).map(c => {
+            const ours = c.ours, theirs = c.theirs;
+            const sum = ours + theirs || 1;
+            return `
+              <div class="cmp-row">
+                <div class="cmp-metric">${c.metric}</div>
+                <div class="cmp-head"><span class="ours">우리 ${ours}</span><span class="theirs">경쟁사 ${theirs}</span></div>
+                <div class="cmp-bar">
+                    <div class="ours-fill" style="width:${ours/sum*100}%"></div>
+                    <div class="theirs-fill" style="width:${theirs/sum*100}%"></div>
+                </div>
+              </div>`;
+        }).join('') || '<div class="empty" style="padding:16px 0">비교 데이터 없음</div>';
+
+        document.getElementById('backdrop').classList.add('show');
+        document.getElementById('reminderModal').classList.add('show');
+    }
+    function closeReminder() {
+        document.getElementById('backdrop').classList.remove('show');
+        document.getElementById('reminderModal').classList.remove('show');
+    }
+
+    /* =========================================================
+       3. 경비 관리 (localStorage)
+    ========================================================= */
+    const EXP_KEY = 'ssp_expenses';
+    function getExpenses() {
+        try { return JSON.parse(localStorage.getItem(EXP_KEY)) || []; }
+        catch { return []; }
+    }
+    function saveExpenses(arr) { localStorage.setItem(EXP_KEY, JSON.stringify(arr)); }
+
+    function addExpense() {
+        const cat = document.getElementById('expCat').value;
+        const memo = document.getElementById('expMemo').value.trim();
+        const amt = parseInt(document.getElementById('expAmt').value, 10);
+        const date = document.getElementById('expDate').value;
+        if (!amt || amt <= 0) { alert('금액을 입력하세요'); return; }
+        if (!date) { alert('날짜를 선택하세요'); return; }
+        const arr = getExpenses();
+        arr.push({ id: Date.now(), cat, memo: memo || cat, amt, date });
+        saveExpenses(arr);
+        document.getElementById('expMemo').value = '';
+        document.getElementById('expAmt').value = '';
+        renderExpenses();
+    }
+    function delExpense(id) {
+        saveExpenses(getExpenses().filter(e => e.id !== id));
+        renderExpenses();
+    }
+    function fmt(n) { return n.toLocaleString('ko-KR') + '원'; }
+
+    function renderExpenses() {
+        const arr = getExpenses().sort((a,b) => b.date.localeCompare(a.date) || b.id - a.id);
+        const now = new Date();
+        const ym = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0');
+        const monthSum = arr.filter(e => e.date.startsWith(ym)).reduce((s,e) => s+e.amt, 0);
+        document.getElementById('monthTotal').textContent = fmt(monthSum);
+
+        const list = document.getElementById('expenseList');
+        if (!arr.length) { list.innerHTML = '<div class="empty">등록된 경비가 없습니다</div>'; return; }
+
+        const byDay = {};
+        arr.forEach(e => { (byDay[e.date] = byDay[e.date] || []).push(e); });
+
+        list.innerHTML = Object.keys(byDay).sort((a,b)=>b.localeCompare(a)).map(day => {
+            const items = byDay[day];
+            const daySum = items.reduce((s,e)=>s+e.amt,0);
+            return `
+              <div class="day-group">
+                <div class="day-head"><span>${day}</span><span class="day-sum">${fmt(daySum)}</span></div>
+                ${items.map(e => `
+                  <div class="expense-item">
+                    <div>
+                        <span class="cat">${e.cat}</span>
+                        <p class="memo" style="margin-top:6px;">${e.memo}</p>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <span class="amt">${fmt(e.amt)}</span>
+                        <button class="del-btn" onclick="delExpense(${e.id})">✕</button>
+                    </div>
+                  </div>`).join('')}
+              </div>`;
+        }).join('');
+    }
+
+    /* =========================================================
+       탭 전환 + 검색 + 현황
+    ========================================================= */
+    const TITLES = {
+        daily: ['영업 현황', '거래처를 눌러 면담 브리핑을 확인하세요', '✍️ 새 일보'],
+        status: ['영업 현황판', '이번 달 활동 요약', ''],
+        search: ['거래처 검색', '병원명 또는 의사명으로 검색', ''],
+        expense: ['경비 관리', '영수증을 날짜별로 기록하세요', '']
+    };
+    document.querySelectorAll('.nav-item').forEach(item => {
+        item.addEventListener('click', () => {
+            const page = item.dataset.page;
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+            item.classList.add('active');
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            // daily/status/search 모두 page-daily 구조 재활용 아님 — 개별 페이지
+            const map = { daily:'page-daily', status:'page-status', search:'page-search', expense:'page-expense' };
+            document.getElementById(map[page]).classList.add('active');
+            const [t, s, act] = TITLES[page];
+            document.getElementById('pageTitle').textContent = t;
+            document.getElementById('pageSub').textContent = s;
+            document.getElementById('headerAction').style.display = act ? '' : 'none';
+            document.getElementById('headerAction').textContent = act;
+            if (page === 'status') renderStatus();
+        });
+    });
+
+    function renderStatus() {
+        const exp = getExpenses();
+        const now = new Date();
+        const ym = now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
+        const monthExp = exp.filter(e=>e.date.startsWith(ym)).reduce((s,e)=>s+e.amt,0);
+        document.getElementById('statusView').innerHTML = `
+            <div class="hospital-card"><div class="card-top"><h3>관리 거래처</h3><span class="point-tag">${hospitals.length}곳</span></div><p class="doctor">면담 포인트 등록된 활성 거래처</p></div>
+            <div class="hospital-card"><div class="card-top"><h3>이번 달 경비</h3><span class="point-tag">${monthExp.toLocaleString('ko-KR')}원</span></div><p class="doctor">${new Date().getMonth()+1}월 누적 사용액</p></div>
+            <div class="hospital-card"><div class="card-top"><h3>면담 대기</h3><span class="point-tag">${hospitals.filter(h=>h.keywords&&h.keywords.length).length}건</span></div><p class="doctor">브리핑 준비된 거래처</p></div>
+        `;
+    }
+
+    document.getElementById('searchBox').addEventListener('input', e => {
+        const q = e.target.value.trim().toLowerCase();
+        const res = hospitals.filter(h => h.name.toLowerCase().includes(q) || h.doctor.toLowerCase().includes(q));
+        document.getElementById('searchResult').innerHTML = q === '' ? '' :
+            (res.length ? res.map(h => `
+                <div class="hospital-card" onclick="showReminder(${h.id})">
+                    <div class="card-top"><h3>${h.name}</h3></div>
+                    <p class="doctor">${h.doctor}</p>
+                </div>`).join('') : '<div class="empty">검색 결과가 없습니다</div>');
+    });
+
+    /* 초기화 */
+    document.getElementById('expDate').value = new Date().toISOString().slice(0,10);
+    loadHospitals();
+    renderExpenses();
+
+    /* 4. Service Worker 등록 (배포 환경 전용) */
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('service-worker.js').catch(()=>{});
+        });
+    }
+    </script>
+</body>
+</html>
